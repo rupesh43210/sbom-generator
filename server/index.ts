@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { createServer } from "http";
 
 const app = express();
 app.use(express.json());
@@ -8,6 +9,7 @@ app.use(express.urlencoded({ extended: false }));
 
 // Add CORS middleware
 app.use((req, res, next) => {
+  // Allow requests from any origin in development
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -71,10 +73,33 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
-  });
+  // Function to find an available port
+  const findAvailablePort = (startPort: number): Promise<number> => {
+    return new Promise((resolve) => {
+      const server = createServer();
+      server.on('error', () => {
+        // Port is in use, try the next one
+        resolve(findAvailablePort(startPort + 1));
+      });
+      server.on('listening', () => {
+        // Found an available port
+        server.close(() => resolve(startPort));
+      });
+      server.listen(startPort, "0.0.0.0");
+    });
+  };
+
+  // Try to use port 5000 first, then find an available port if needed
+  const DEFAULT_PORT = 5000;
+  try {
+    server.listen(DEFAULT_PORT, "0.0.0.0", () => {
+      log(`serving on port ${DEFAULT_PORT}`);
+    });
+  } catch (error) {
+    // If default port is unavailable, find another one
+    const availablePort = await findAvailablePort(3000);
+    server.listen(availablePort, "0.0.0.0", () => {
+      log(`Default port ${DEFAULT_PORT} was unavailable. Now serving on port ${availablePort}`);
+    });
+  }
 })();
