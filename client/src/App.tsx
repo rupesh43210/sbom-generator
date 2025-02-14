@@ -16,6 +16,7 @@ import Edit from "@/pages/edit";
 import Search from "@/pages/search";
 import NotFound from "@/pages/not-found";
 import Settings from "@/pages/settings";
+import Documentation from "@/pages/docs";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/edit/:id" component={Edit} />
       <Route path="/search" component={Search} />
       <Route path="/settings" component={Settings} />
+      <Route path="/docs" component={Documentation} />
       <Route component={NotFound} />
     </Switch>
   );
