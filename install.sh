@@ -22,8 +22,13 @@ check_command() {
 setup_env() {
     if [ ! -f .env ]; then
         echo -e "\n${YELLOW}🔧 Creating .env file...${NC}"
-        echo "NVD_API_KEY=" > .env
-        echo -e "${GREEN}✓ .env file created${NC}"
+        if [ -f .env.example ]; then
+            cp .env.example .env
+            echo -e "${GREEN}✓ .env file created from example${NC}"
+        else
+            echo "NVD_API_KEY=" > .env
+            echo -e "${GREEN}✓ Basic .env file created${NC}"
+        fi
     else
         echo -e "${GREEN}✓ .env file already exists${NC}"
     fi
@@ -60,6 +65,7 @@ show_summary() {
     if [ -d .git ]; then
         echo -e "${GREEN}✓ Git repository initialized${NC}"
     fi
+    echo -e "${GREEN}✓ Build completed${NC}"
 }
 
 # Function to find available port
@@ -69,6 +75,32 @@ find_available_port() {
         port=$((port+1))
     done
     echo $port
+}
+
+# Function to build the application
+build_app() {
+    echo -e "\n${GREEN}🏗️  Building application...${NC}"
+    if ! npm run build; then
+        echo -e "${RED}❌ Build failed${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Build completed successfully${NC}"
+}
+
+# Function to start the application
+start_app() {
+    echo -e "\n${GREEN}🚀 Starting SBOM Generator...${NC}"
+    
+    # Kill any existing process on the port
+    if lsof -ti :$PORT >/dev/null; then
+        echo -e "${YELLOW}⚠️  Port $PORT is in use. Stopping existing process...${NC}"
+        kill -9 $(lsof -ti :$PORT) 2>/dev/null
+    fi
+    
+    if ! PORT=$PORT npm run start; then
+        echo -e "${RED}❌ Failed to start SBOM Generator${NC}"
+        exit 1
+    fi
 }
 
 # Check required commands
@@ -106,6 +138,9 @@ fi
 APP_PORT=$(find_available_port)
 export PORT=$APP_PORT
 
+# Build the application
+build_app
+
 # Show installation summary
 show_summary
 
@@ -113,21 +148,16 @@ echo -e "\n${GREEN}✅ Installation complete!${NC}"
 
 # Application access instructions
 echo -e "\n${YELLOW}🌐 Accessing the Application:${NC}"
-echo -e "1. Start the development server:"
-echo -e "   ${GREEN}npm run dev${NC}"
-echo -e "\n2. Once started, access the application at:"
+echo -e "1. The application will start automatically"
+echo -e "2. Access the application at:"
 echo -e "   • Local:   ${GREEN}http://localhost:$APP_PORT${NC}"
 echo -e "   • Network: ${GREEN}http://0.0.0.0:$APP_PORT${NC}"
-echo -e "   The app will be available on port $APP_PORT by default"
 
-echo -e "${GREEN}🌐 Using port $APP_PORT${NC}"
-
-echo -e "\n${YELLOW}🔑 NVD Integration (Optional):${NC}"
-echo -e "• The application will work without an NVD API key"
-echo -e "• Basic SBOM generation and management will function normally"
-echo -e "• To enable vulnerability scanning features later:"
+echo -e "\n${YELLOW}🔑 NVD Integration:${NC}"
+echo -e "• To enable vulnerability scanning:"
 echo "  1. Get an API key from https://nvd.nist.gov/developers/request-an-api-key"
 echo "  2. Add it to .env file: NVD_API_KEY=your-key-here"
+echo "  3. The key will be loaded automatically - no restart needed"
 
 if [ -d .git ]; then
     echo -e "\n${YELLOW}📝 GitHub Integration:${NC}"
@@ -138,18 +168,14 @@ fi
 
 # Verify the complete installation
 echo -e "\n${GREEN}🔍 Final Verification:${NC}"
-if [ -f package.json ] && [ -d node_modules ] && [ -f .env ]; then
+if [ -f package.json ] && [ -d node_modules ] && [ -f .env ] && [ -d dist ]; then
     echo -e "${GREEN}✓ All components are installed correctly${NC}"
-    echo -e "${GREEN}✓ Ready to start development!${NC}"
-    echo -e "\n${BLUE}Happy coding! 🎉${NC}"
+    echo -e "${GREEN}✓ Ready to start!${NC}"
+    echo -e "\n${BLUE}Starting SBOM Generator... 🎉${NC}"
 else
-    echo -e "${RED}⚠️  Some components may be missing. Please check the logs above for errors.${NC}"
+    echo -e "${RED}⚠️  Some components are missing. Please check the logs above for errors.${NC}"
+    exit 1
 fi
 
-# Start application
-echo -e "\n${GREEN}🚀 Starting SBOM generator...${NC}"
-npm run build
-if ! npm run start; then
-  echo -e "${RED}❌ Failed to start SBOM generator${NC}"
-  exit 1
-fi
+# Start the application
+start_app
