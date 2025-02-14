@@ -61,6 +61,126 @@ check_system_requirements() {
     fi
 }
 
+# Function to check internet connectivity
+check_internet() {
+    echo -e "${BLUE}🌐 Checking internet connectivity...${NC}"
+    
+    # Try multiple reliable domains
+    local test_domains=("google.com" "github.com" "npmjs.com")
+    local connected=false
+    
+    for domain in "${test_domains[@]}"; do
+        if ping -c 1 "$domain" &> /dev/null; then
+            connected=true
+            break
+        fi
+    done
+    
+    if ! $connected; then
+        echo -e "${RED}❌ No internet connection detected${NC}"
+        echo -e "${YELLOW}Please check your internet connection and try again${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓ Internet connection verified${NC}"
+}
+
+# Function to validate NVD API key
+validate_nvd_key() {
+    local api_key=$1
+    echo -e "${BLUE}🔑 Validating NVD API key...${NC}"
+    
+    # Skip if no key provided
+    if [ -z "$api_key" ]; then
+        echo -e "${YELLOW}⚠️  No NVD API key provided${NC}"
+        echo -e "${YELLOW}   Vulnerability scanning will be limited${NC}"
+        return 0
+    fi
+    
+    # Test API key with a simple query
+    local response=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "apiKey: $api_key" \
+        "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1")
+    
+    if [ "$response" = "200" ]; then
+        echo -e "${GREEN}✓ NVD API key is valid${NC}"
+        return 0
+    elif [ "$response" = "403" ]; then
+        echo -e "${RED}❌ Invalid NVD API key${NC}"
+        echo -e "${YELLOW}Please check your API key and try again${NC}"
+        echo -e "${YELLOW}Get a key from: https://nvd.nist.gov/developers/request-an-api-key${NC}"
+        return 1
+    else
+        echo -e "${RED}❌ Error checking NVD API key (HTTP $response)${NC}"
+        echo -e "${YELLOW}There might be an issue with the NVD service${NC}"
+        return 1
+    fi
+}
+
+# Function to set up environment file
+setup_env() {
+    if [ ! -f .env ]; then
+        echo -e "\n${YELLOW}🔧 Creating .env file...${NC}"
+        if [ -f .env.example ]; then
+            cp .env.example .env
+            echo -e "${GREEN}✓ .env file created from example${NC}"
+        else
+            echo "NVD_API_KEY=" > .env
+            echo -e "${GREEN}✓ Basic .env file created${NC}"
+        fi
+        
+        # Ask for NVD API key
+        echo -e "\n${BLUE}🔑 NVD API Key Setup${NC}"
+        echo -e "Would you like to configure your NVD API key now? (Recommended)"
+        read -p "Enter your NVD API key (or press Enter to skip): " nvd_key
+        
+        if [ ! -z "$nvd_key" ]; then
+            if validate_nvd_key "$nvd_key"; then
+                sed -i "s/NVD_API_KEY=.*/NVD_API_KEY=$nvd_key/" .env
+                echo -e "${GREEN}✓ NVD API key configured${NC}"
+            fi
+        fi
+    else
+        echo -e "${GREEN}✓ .env file already exists${NC}"
+        # Validate existing NVD API key
+        existing_key=$(grep "NVD_API_KEY" .env | cut -d '=' -f2)
+        if [ ! -z "$existing_key" ]; then
+            validate_nvd_key "$existing_key"
+        fi
+    fi
+}
+
+# Function to check and install npm dependencies
+install_dependencies() {
+    echo -e "\n${GREEN}📦 Checking dependencies...${NC}"
+    
+    # Verify npm registry access
+    echo -e "${BLUE}📡 Checking npm registry access...${NC}"
+    if ! npm ping &> /dev/null; then
+        echo -e "${RED}❌ Cannot access npm registry${NC}"
+        echo -e "${YELLOW}Please check your internet connection and npm configuration${NC}"
+        exit 1
+    fi
+    
+    if [ ! -d "node_modules" ]; then
+        echo -e "${YELLOW}⚙️  First-time installation detected${NC}"
+        if ! npm install; then
+            echo -e "${RED}❌ Installation failed${NC}"
+            echo -e "${YELLOW}Try running with --verbose for more details${NC}"
+            exit 1
+        fi
+    elif [ "$(find package.json -newer package-lock.json)" ]; then
+        echo -e "${YELLOW}⚙️  Dependency updates detected${NC}"
+        if ! npm update; then
+            echo -e "${RED}❌ Update failed${NC}"
+            echo -e "${YELLOW}Try running with --verbose for more details${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}✅ Dependencies already up-to-date${NC}"
+    fi
+}
+
 # Function to install Node.js and npm on different distributions
 install_node() {
     local DISTRO=$(detect_distro)
@@ -108,43 +228,6 @@ check_command() {
             echo -e "Please install $1 using your system's package manager."
             exit 1
         fi
-    fi
-}
-
-# Function to set up environment file
-setup_env() {
-    if [ ! -f .env ]; then
-        echo -e "\n${YELLOW}🔧 Creating .env file...${NC}"
-        if [ -f .env.example ]; then
-            cp .env.example .env
-            echo -e "${GREEN}✓ .env file created from example${NC}"
-        else
-            echo "NVD_API_KEY=" > .env
-            echo -e "${GREEN}✓ Basic .env file created${NC}"
-        fi
-    else
-        echo -e "${GREEN}✓ .env file already exists${NC}"
-    fi
-}
-
-# Function to check and install npm dependencies
-install_dependencies() {
-    echo -e "\n${GREEN}📦 Checking dependencies...${NC}"
-    
-    if [ ! -d "node_modules" ]; then
-        echo -e "${YELLOW}⚙️  First-time installation detected${NC}"
-        if ! npm install; then
-            echo -e "${RED}❌ Installation failed${NC}"
-            exit 1
-        fi
-    elif [ "$(find package.json -newer package-lock.json)" ]; then
-        echo -e "${YELLOW}⚙️  Dependency updates detected${NC}"
-        if ! npm update; then
-            echo -e "${RED}❌ Update failed${NC}"
-            exit 1
-        fi
-    else
-        echo -e "${GREEN}✅ Dependencies already up-to-date${NC}"
     fi
 }
 
@@ -202,8 +285,9 @@ main() {
     echo -e "${BLUE}Welcome to SBOM Generator Installation${NC}"
     echo -e "${BLUE}=====================================${NC}\n"
     
-    # Check system requirements
+    # Check system requirements and internet connectivity
     check_system_requirements
+    check_internet
     
     # Check and install required commands
     echo -e "${GREEN}🔍 Checking dependencies...${NC}"
