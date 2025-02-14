@@ -399,17 +399,38 @@ export default function Create() {
                                   await populateKnownComponent(index, option);
                                 }}
                                 onSearch={async (query) => {
-                                  const results = await searchNvdProducts(query);
-                                  return results.map(result => ({
-                                    value: result.cpe.titles[0]?.title || result.cpe.cpeName,
-                                    label: result.cpe.titles[0]?.title || result.cpe.cpeName,
-                                    cpe: result.cpe.cpeName
-                                  }));
+                                  try {
+                                    const results = await searchNvdProducts(query);
+                                    if (results.length === 0) {
+                                      // If no NVD results, create a manual entry option
+                                      return [{
+                                        value: query,
+                                        label: `Use "${query}" (Manual Entry)`,
+                                        cpe: undefined
+                                      }];
+                                    }
+                                    return results.map(result => ({
+                                      value: result.cpe.titles[0]?.title || result.cpe.cpeName,
+                                      label: result.cpe.titles[0]?.title || result.cpe.cpeName,
+                                      cpe: result.cpe.cpeName
+                                    }));
+                                  } catch (error) {
+                                    console.error('Error searching NVD:', error);
+                                    // On error, allow manual entry
+                                    return [{
+                                      value: query,
+                                      label: `Use "${query}" (Manual Entry)`,
+                                      cpe: undefined
+                                    }];
+                                  }
                                 }}
-                                placeholder="Search for components..."
-                                emptyMessage="No components found in NVD database."
+                                placeholder="Search for components or enter manually..."
+                                emptyMessage="Enter component details manually or try a different search term."
                               />
                             </FormControl>
+                            <FormDescription>
+                              Search for components or enter details manually if not found in NVD database.
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -741,6 +762,17 @@ function VulnerabilitiesSection({ cpe }: { cpe: string }) {
     queryKey: [`/api/nvd/vulnerabilities?cpe=${encodeURIComponent(cpe)}`],
     enabled: !!cpe
   });
+
+  if (!process.env.NVD_API_KEY) {
+    return (
+      <Alert>
+        <AlertTitle>Manual Vulnerability Assessment</AlertTitle>
+        <AlertDescription>
+          NVD integration is not configured. Please assess vulnerabilities manually or add an NVD API key to enable automatic scanning.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   if (isLoading) {
     return <div>Checking for vulnerabilities...</div>;

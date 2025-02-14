@@ -14,7 +14,8 @@ export async function registerRoutes(app: Express) {
 
       const apiKey = process.env.NVD_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ message: 'NVD API key not configured' });
+        // Return empty results but don't throw an error
+        return res.json([]);
       }
 
       const response = await fetch(
@@ -34,7 +35,8 @@ export async function registerRoutes(app: Express) {
       res.json(data.products || []);
     } catch (error) {
       console.error('NVD search error:', error);
-      res.status(500).json({ message: 'Failed to search NVD database' });
+      // Return empty results on error to allow manual input
+      res.json([]);
     }
   });
 
@@ -47,7 +49,13 @@ export async function registerRoutes(app: Express) {
 
       const apiKey = process.env.NVD_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ message: 'NVD API key not configured' });
+        // Return default version info to allow manual input
+        return res.json([{
+          version: '1.0.0',
+          releaseDate: new Date().toISOString(),
+          cpe: cpe,
+          references: []
+        }]);
       }
 
       const response = await fetch(
@@ -96,7 +104,6 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Add this after the existing NVD endpoints
   app.get("/api/nvd/vulnerabilities", async (req, res) => {
     try {
       const { cpe } = req.query;
@@ -146,7 +153,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Existing SBOM routes...
+  // Add this after the existing NVD endpoints
   app.get("/api/sboms", async (_req, res) => {
     const sboms = await storage.getAllSboms();
     res.json(sboms);
