@@ -31,31 +31,23 @@ setup_env() {
 
 # Function to check and install npm dependencies
 install_dependencies() {
-    echo -e "\n${GREEN}📦 Installing dependencies...${NC}"
-    if [ ! -f package-lock.json ]; then
-        npm install
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}❌ Failed to install dependencies${NC}"
-            echo -e "${RED}Please check your internet connection and try again${NC}"
+    echo -e "\n${GREEN}📦 Checking dependencies...${NC}"
+    
+    if [ ! -d "node_modules" ]; then
+        echo -e "${YELLOW}⚙️  First-time installation detected${NC}"
+        if ! npm install; then
+            echo -e "${RED}❌ Installation failed${NC}"
+            exit 1
+        fi
+    elif [ "$(find package.json -newer package-lock.json)" ]; then
+        echo -e "${YELLOW}⚙️  Dependency updates detected${NC}"
+        if ! npm update; then
+            echo -e "${RED}❌ Update failed${NC}"
             exit 1
         fi
     else
-        npm ci
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}❌ Failed to install dependencies${NC}"
-            echo -e "${RED}Try removing node_modules and package-lock.json, then run the script again${NC}"
-            exit 1
-        fi
+        echo -e "${GREEN}✅ Dependencies already up-to-date${NC}"
     fi
-
-    # Verify critical dependencies
-    if [ ! -d "node_modules/@tanstack" ] || [ ! -d "node_modules/react" ]; then
-        echo -e "${RED}❌ Critical dependencies are missing${NC}"
-        echo -e "${RED}Please try running 'npm install' manually${NC}"
-        exit 1
-    fi
-
-    echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
 }
 
 # Function to show installation summary
@@ -68,6 +60,15 @@ show_summary() {
     if [ -d .git ]; then
         echo -e "${GREEN}✓ Git repository initialized${NC}"
     fi
+}
+
+# Function to find available port
+find_available_port() {
+    local port=5000
+    while lsof -i :$port >/dev/null; do
+        port=$((port+1))
+    done
+    echo $port
 }
 
 # Check required commands
@@ -101,6 +102,10 @@ if [ ! -d .git ]; then
     echo -e "${GREEN}✓ Git repository initialized${NC}"
 fi
 
+# Find available port
+APP_PORT=$(find_available_port)
+export PORT=$APP_PORT
+
 # Show installation summary
 show_summary
 
@@ -111,9 +116,11 @@ echo -e "\n${YELLOW}🌐 Accessing the Application:${NC}"
 echo -e "1. Start the development server:"
 echo -e "   ${GREEN}npm run dev${NC}"
 echo -e "\n2. Once started, access the application at:"
-echo -e "   • Local:   ${GREEN}http://localhost:5000${NC}"
-echo -e "   • Network: ${GREEN}http://0.0.0.0:5000${NC}"
-echo -e "   The app will be available on port 5000 by default"
+echo -e "   • Local:   ${GREEN}http://localhost:$APP_PORT${NC}"
+echo -e "   • Network: ${GREEN}http://0.0.0.0:$APP_PORT${NC}"
+echo -e "   The app will be available on port $APP_PORT by default"
+
+echo -e "${GREEN}🌐 Using port $APP_PORT${NC}"
 
 echo -e "\n${YELLOW}🔑 NVD Integration (Optional):${NC}"
 echo -e "• The application will work without an NVD API key"
@@ -137,4 +144,12 @@ if [ -f package.json ] && [ -d node_modules ] && [ -f .env ]; then
     echo -e "\n${BLUE}Happy coding! 🎉${NC}"
 else
     echo -e "${RED}⚠️  Some components may be missing. Please check the logs above for errors.${NC}"
+fi
+
+# Start application
+echo -e "\n${GREEN}🚀 Starting SBOM generator...${NC}"
+npm run build
+if ! npm run start; then
+  echo -e "${RED}❌ Failed to start SBOM generator${NC}"
+  exit 1
 fi

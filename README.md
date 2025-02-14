@@ -2,14 +2,16 @@
 
 A comprehensive Software Bill of Materials (SBOM) generator that provides advanced component identification, real-time vulnerability tracking, and seamless NVD database integration for robust software security analysis.
 
+**Author**: Rupesh (rupesh)
+
 ## Features
 
-- 🔍 Advanced component identification
-- 🔄 Real-time vulnerability tracking
-- 🔌 NVD database integration
-- 📝 SPDX format support
-- 🚀 Auto-population of component details
-- ⬇️ SBOM download functionality
+- 🔍 Advanced component identification with NVD database integration
+- 🔄 Real-time component search and validation
+- 📝 Support for both public and proprietary components
+- 🚀 Auto-population of component details from NVD
+- 🔒 Secure API key management
+- 💻 Modern React-based UI with TypeScript
 
 ## Prerequisites
 
@@ -17,46 +19,57 @@ A comprehensive Software Bill of Materials (SBOM) generator that provides advanc
 - npm (v8 or higher)
 - NVD API Key (Get one from [NVD API Key Request](https://nvd.nist.gov/developers/request-an-api-key))
 
-## Quick Start
+## Installation
 
 1. Clone the repository:
 ```bash
-git clone [your-repo-url]
+git clone https://github.com/[your-username]/sbom-generator.git
 cd sbom-generator
 ```
 
-2. Run the installation script:
+2. Install dependencies:
 ```bash
-chmod +x install.sh
-./install.sh
+npm install
 ```
 
-3. Add your NVD API key to the `.env` file:
+3. Create a `.env` file in the root directory:
 ```bash
 NVD_API_KEY=your-api-key-here
 ```
 
-4. Start the development server:
+## Development
+
+Start the development server:
 ```bash
 npm run dev
 ```
 
-5. Open your browser and navigate to `http://localhost:5000`
+The application will be available at `http://localhost:5003`
+
+## Production
+
+Build and start the production server:
+```bash
+npm run build
+PORT=5003 npm run start
+```
 
 ## Usage
 
-1. Create a new SBOM by clicking the "Create New SBOM" button
-2. Search for components using the search bar
-3. Add component details manually or use auto-population from NVD database
-4. Download your SBOM in JSON format
+1. **Component Search**:
+   - Use the search bar to find components in the NVD database
+   - Components can be added manually if not found in NVD
+   - The system will show appropriate messages if NVD is not accessible
 
-## Tech Stack
+2. **Adding Components**:
+   - Select components from the dropdown
+   - Fill in additional details as needed
+   - Mark components as proprietary if they're internal
 
-- React frontend with TypeScript
-- Node.js backend
-- NVD API integration
-- Tailwind CSS for styling
-- shadcn/ui components
+3. **Error Handling**:
+   - The system gracefully handles missing API keys
+   - Provides offline support with manual entry
+   - Shows clear error messages for troubleshooting
 
 ## Contributing
 
@@ -68,4 +81,10 @@ npm run dev
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built with React, TypeScript, and Express
+- Uses the NVD API for component validation
+- Styled with Tailwind CSS and Shadcn UI

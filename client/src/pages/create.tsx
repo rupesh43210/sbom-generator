@@ -1,3 +1,12 @@
+/**
+ * SBOM Generator - Create Component
+ * Component for creating and managing SBOM entries
+ * 
+ * @author Rupesh (rupesh)
+ * @copyright 2025 Rupesh. All rights reserved.
+ * @license MIT
+ */
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, UseMutationResult } from "@tanstack/react-query";
@@ -24,9 +33,9 @@ import {
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { insertSbomSchema, type InsertSbom, type Component } from "@shared/schema";
@@ -288,11 +297,13 @@ export default function Create() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <Card className="max-w-4xl mx-auto">
+    <div className="max-w-2xl mx-auto">
+      <Card>
         <CardHeader>
-          <CardTitle>Create New SBOM</CardTitle>
-          <CardDescription>Fill in the details to generate a new Software Bill of Materials</CardDescription>
+          <CardTitle>Create SBOM Entry</CardTitle>
+          <CardDescription>
+            Search for components in the NVD database or add them manually
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -401,26 +412,35 @@ export default function Create() {
                                 onSearch={async (query) => {
                                   try {
                                     const results = await searchNvdProducts(query);
-                                    if (results.length === 0) {
-                                      // If no NVD results, create a manual entry option
-                                      return [{
-                                        value: query,
-                                        label: `Use "${query}" (Manual Entry)`,
-                                        cpe: undefined
-                                      }];
+                                    console.log('Raw NVD search results:', results);
+                                    
+                                    // Filter out error messages for display
+                                    const displayResults = results.filter(result => !result.data.isError);
+                                    
+                                    // Show error toast if there's an error message
+                                    const errorResult = results.find(result => result.data.isError);
+                                    if (errorResult) {
+                                      toast({
+                                        title: errorResult.label,
+                                        description: errorResult.data.error,
+                                        variant: "destructive",
+                                      });
                                     }
-                                    return results.map(result => ({
-                                      value: result.cpe.titles[0]?.title || result.cpe.cpeName,
-                                      label: result.cpe.titles[0]?.title || result.cpe.cpeName,
-                                      cpe: result.cpe.cpeName
-                                    }));
+
+                                    return displayResults;
                                   } catch (error) {
                                     console.error('Error searching NVD:', error);
                                     // On error, allow manual entry
                                     return [{
                                       value: query,
                                       label: `Use "${query}" (Manual Entry)`,
-                                      cpe: undefined
+                                      data: {
+                                        name: query,
+                                        version: '',
+                                        vendor: '',
+                                        type: 'manual',
+                                        isManualEntry: true
+                                      }
                                     }];
                                   }
                                 }}

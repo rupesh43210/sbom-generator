@@ -20,7 +20,14 @@ import { useDebounce } from "@/hooks/useDebounce";
 export interface SearchOption {
   value: string;
   label: string;
-  cpe?: string;
+  data: {
+    name: string;
+    version: string;
+    vendor: string;
+    cpe?: string;
+    type: 'nvd' | 'manual';
+    isManualEntry?: boolean;
+  };
 }
 
 interface ComboboxSearchProps {
@@ -97,7 +104,7 @@ export function ComboboxSearch({
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
-                  key={`${option.value}-${option.cpe || ''}`}
+                  key={`${option.value}-${option.data.cpe || ''}`}
                   value={option.value}
                   onSelect={() => {
                     onValueChange(option);
