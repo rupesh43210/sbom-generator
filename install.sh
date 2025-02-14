@@ -12,16 +12,48 @@ set -e
 trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
 trap 'echo -e "${RED}❌ Command \"${last_command}\" failed with exit code $?.${NC}"' EXIT
 
+# Detect OS type
+OS_TYPE="unknown"
+case "$OSTYPE" in
+    darwin*)  OS_TYPE="macos" ;;
+    linux*)   OS_TYPE="linux" ;;
+    *)        OS_TYPE="unknown" ;;
+esac
+
 echo -e "${GREEN}🚀 Setting up SBOM Generator...${NC}\n"
 
-# Function to detect Linux distribution
-detect_distro() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        echo "$ID"
-    else
-        echo "unknown"
-    fi
+# Function to get available memory in MB
+get_available_memory() {
+    local mem_available
+    
+    case "$OS_TYPE" in
+        "macos")
+            # Use vm_stat on macOS
+            local page_size=$(pagesize)
+            local pages_free=$(vm_stat | grep "Pages free:" | grep -o "[0-9]*")
+            local pages_speculative=$(vm_stat | grep "Pages speculative:" | grep -o "[0-9]*")
+            mem_available=$(((pages_free + pages_speculative) * page_size / 1024 / 1024))
+            ;;
+        "linux")
+            # Use free on Linux if available
+            if command -v free >/dev/null 2>&1; then
+                mem_available=$(free -m | awk '/^Mem:/ {print $7}')
+            else
+                # Fallback to /proc/meminfo
+                mem_available=$(grep MemAvailable /proc/meminfo | awk '{print $2 / 1024}')
+            fi
+            ;;
+        *)
+            mem_available=0
+            ;;
+    esac
+    
+    echo "$mem_available"
+}
+
+# Function to get available disk space in MB
+get_disk_space() {
+    df -m . | awk 'NR==2 {print $4}'
 }
 
 # Function to check system requirements
@@ -29,13 +61,13 @@ check_system_requirements() {
     echo -e "${BLUE}🔍 Checking system requirements...${NC}"
     
     # Check memory
-    total_memory=$(free -m | awk '/^Mem:/{print $2}')
-    if [ "$total_memory" -lt 1024 ]; then
+    local mem_available=$(get_available_memory)
+    if [ "$mem_available" -lt 1024 ]; then
         echo -e "${YELLOW}⚠️  Warning: Less than 1GB RAM available${NC}"
     fi
     
     # Check disk space
-    free_space=$(df -m . | awk 'NR==2 {print $4}')
+    local free_space=$(get_disk_space)
     if [ "$free_space" -lt 1024 ]; then
         echo -e "${YELLOW}⚠️  Warning: Less than 1GB free disk space${NC}"
     fi
@@ -46,19 +78,101 @@ check_system_requirements() {
         echo -e "${YELLOW}   This is not recommended for security reasons.${NC}"
         echo -e "${YELLOW}   Consider running as a non-root user with sudo privileges.${NC}"
         
-        # Ask for confirmation
         read -p "Continue as root? (y/N) " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             echo -e "${RED}Installation cancelled${NC}"
             exit 1
         fi
-        
-        # Set npm to use different directory for global packages
-        echo -e "${BLUE}📦 Configuring npm for root user...${NC}"
-        mkdir -p /usr/local/lib/node_modules
-        npm config set prefix /usr/local
     fi
+}
+
+# Function to detect package manager
+detect_package_manager() {
+    if command -v apt-get >/dev/null 2>&1; then
+        echo "apt"
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "dnf"
+    elif command -v yum >/dev/null 2>&1; then
+        echo "yum"
+    elif command -v pacman >/dev/null 2>&1; then
+        echo "pacman"
+    elif command -v brew >/dev/null 2>&1; then
+        echo "brew"
+    else
+        echo "unknown"
+    fi
+}
+
+# Function to install Node.js and npm
+install_node() {
+    echo -e "${YELLOW}📦 Installing Node.js and npm...${NC}"
+    
+    case "$OS_TYPE" in
+        "macos")
+            if ! command -v brew >/dev/null 2>&1; then
+                echo -e "${YELLOW}Installing Homebrew...${NC}"
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            fi
+            brew install node@18
+            ;;
+        "linux")
+            local pkg_manager=$(detect_package_manager)
+            case "$pkg_manager" in
+                "apt")
+                    echo -e "${BLUE}📦 Adding NodeSource repository...${NC}"
+                    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+                    sudo apt-get install -y nodejs
+                    ;;
+                "dnf")
+                    sudo dnf install -y nodejs npm
+                    ;;
+                "yum")
+                    curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo -E bash -
+                    sudo yum install -y nodejs
+                    ;;
+                "pacman")
+                    sudo pacman -Sy nodejs npm
+                    ;;
+                *)
+                    echo -e "${RED}❌ Unsupported package manager${NC}"
+                    echo -e "${YELLOW}Please install Node.js (v18+) manually from https://nodejs.org${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        *)
+            echo -e "${RED}❌ Unsupported operating system${NC}"
+            echo -e "${YELLOW}Please install Node.js (v18+) manually from https://nodejs.org${NC}"
+            exit 1
+            ;;
+    esac
+    
+    # Verify installation
+    if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        echo -e "${RED}❌ Node.js or npm installation failed${NC}"
+        exit 1
+    fi
+}
+
+# Function to update .env file
+update_env_file() {
+    local key="$1"
+    local value="$2"
+    local file="$3"
+    
+    case "$OS_TYPE" in
+        "macos")
+            sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
+            ;;
+        "linux")
+            sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+            ;;
+        *)
+            # Fallback to perl which works on both systems
+            perl -i -pe "s|^${key}=.*|${key}=${value}|" "$file"
+            ;;
+    esac
 }
 
 # Function to check internet connectivity
@@ -129,20 +243,18 @@ setup_env() {
             echo -e "${GREEN}✓ Basic .env file created${NC}"
         fi
         
-        # Ask for NVD API key
         echo -e "\n${BLUE}🔑 NVD API Key Setup${NC}"
         echo -e "Would you like to configure your NVD API key now? (Recommended)"
         read -p "Enter your NVD API key (or press Enter to skip): " nvd_key
         
         if [ ! -z "$nvd_key" ]; then
             if validate_nvd_key "$nvd_key"; then
-                sed -i "s/NVD_API_KEY=.*/NVD_API_KEY=$nvd_key/" .env
+                update_env_file "NVD_API_KEY" "$nvd_key" ".env"
                 echo -e "${GREEN}✓ NVD API key configured${NC}"
             fi
         fi
     else
         echo -e "${GREEN}✓ .env file already exists${NC}"
-        # Validate existing NVD API key
         existing_key=$(grep "NVD_API_KEY" .env | cut -d '=' -f2)
         if [ ! -z "$existing_key" ]; then
             validate_nvd_key "$existing_key"
@@ -178,56 +290,6 @@ install_dependencies() {
         fi
     else
         echo -e "${GREEN}✅ Dependencies already up-to-date${NC}"
-    fi
-}
-
-# Function to install Node.js and npm on different distributions
-install_node() {
-    local DISTRO=$(detect_distro)
-    echo -e "${YELLOW}📦 Installing Node.js and npm on $DISTRO...${NC}"
-    
-    case $DISTRO in
-        "ubuntu"|"debian")
-            echo -e "${BLUE}📦 Adding NodeSource repository...${NC}"
-            sudo apt-get update || { echo -e "${RED}❌ Failed to update package list${NC}"; exit 1; }
-            sudo apt-get install -y curl || { echo -e "${RED}❌ Failed to install curl${NC}"; exit 1; }
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - || { echo -e "${RED}❌ Failed to add NodeSource repository${NC}"; exit 1; }
-            sudo apt-get install -y nodejs || { echo -e "${RED}❌ Failed to install Node.js${NC}"; exit 1; }
-            ;;
-        "fedora")
-            sudo dnf install -y nodejs npm || { echo -e "${RED}❌ Failed to install Node.js and npm${NC}"; exit 1; }
-            ;;
-        "centos"|"rhel")
-            sudo yum install -y nodejs npm || { echo -e "${RED}❌ Failed to install Node.js and npm${NC}"; exit 1; }
-            ;;
-        "arch")
-            sudo pacman -Sy nodejs npm || { echo -e "${RED}❌ Failed to install Node.js and npm${NC}"; exit 1; }
-            ;;
-        *)
-            echo -e "${RED}❌ Unsupported distribution: $DISTRO${NC}"
-            echo -e "Please install Node.js (v18+) and npm manually from https://nodejs.org"
-            exit 1
-            ;;
-    esac
-    
-    # Verify installation
-    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-        echo -e "${RED}❌ Node.js or npm installation failed${NC}"
-        exit 1
-    fi
-}
-
-# Function to check if a command exists
-check_command() {
-    if ! command -v "$1" &> /dev/null; then
-        echo -e "${RED}❌ $1 is not installed.${NC}"
-        if [ "$1" = "node" ] || [ "$1" = "npm" ]; then
-            echo -e "${YELLOW}🔧 Attempting to install Node.js and npm...${NC}"
-            install_node
-        else
-            echo -e "Please install $1 using your system's package manager."
-            exit 1
-        fi
     fi
 }
 
@@ -291,8 +353,10 @@ main() {
     
     # Check and install required commands
     echo -e "${GREEN}🔍 Checking dependencies...${NC}"
-    check_command "node"
-    check_command "npm"
+    if ! command -v node &> /dev/null; then
+        echo -e "${YELLOW}🔧 Attempting to install Node.js and npm...${NC}"
+        install_node
+    fi
     
     # Verify Node.js version
     NODE_VERSION=$(node -v | cut -d 'v' -f 2)
