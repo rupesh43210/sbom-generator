@@ -294,7 +294,7 @@ install_dependencies() {
             echo -e "${YELLOW}Try running with --verbose for more details${NC}"
             exit 1
         fi
-    elif [ "$(find package.json -newer package-lock.json)" ]; then
+    elif [ -f "package.json" ] && [ -f "package-lock.json" ] && ! npm list >/dev/null 2>&1; then
         echo -e "${YELLOW}  Dependency updates detected${NC}"
         if ! npm update; then
             echo -e "${RED} Update failed${NC}"
@@ -303,6 +303,22 @@ install_dependencies() {
         fi
     else
         echo -e "${GREEN} Dependencies already up-to-date${NC}"
+    fi
+
+    # Run security audit and fix vulnerabilities
+    echo -e "${BLUE} Running security audit...${NC}"
+    if ! npm audit; then
+        echo -e "${YELLOW} Security vulnerabilities detected${NC}"
+        echo -e "${BLUE} Attempting to fix vulnerabilities...${NC}"
+        if ! npm audit fix; then
+            echo -e "${RED} Some vulnerabilities could not be fixed automatically${NC}"
+            echo -e "${YELLOW} Please review npm audit report and fix manually${NC}"
+            # Don't exit here as some vulnerabilities might be acceptable
+        else
+            echo -e "${GREEN} Security vulnerabilities fixed${NC}"
+        fi
+    else
+        echo -e "${GREEN} No security vulnerabilities found${NC}"
     fi
 }
 
