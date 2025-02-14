@@ -39,6 +39,9 @@ yarn-error.log*
 .replit
 replit.nix
 
+# IDE logs
+attached_assets/
+
 #Original entries not present in edited
 server/public
 vite.config.ts.*
