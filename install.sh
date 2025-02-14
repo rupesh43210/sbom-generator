@@ -23,9 +23,7 @@ setup_env() {
     if [ ! -f .env ]; then
         echo -e "\n${YELLOW}🔧 Creating .env file...${NC}"
         echo "NVD_API_KEY=" > .env
-        echo -e "${YELLOW}⚠️  Important: You need an NVD API key to use vulnerability tracking features.${NC}"
-        echo "Get your key at: https://nvd.nist.gov/developers/request-an-api-key"
-        echo -e "Then add it to the .env file: NVD_API_KEY=your-key-here\n"
+        echo -e "${GREEN}✓ .env file created${NC}"
     else
         echo -e "${GREEN}✓ .env file already exists${NC}"
     fi
@@ -117,9 +115,12 @@ echo -e "   • Local:   ${GREEN}http://localhost:5000${NC}"
 echo -e "   • Network: ${GREEN}http://0.0.0.0:5000${NC}"
 echo -e "   The app will be available on port 5000 by default"
 
-echo -e "\n${YELLOW}🔑 Next Steps:${NC}"
-echo "1. Add your NVD API key to the .env file"
-echo "2. Visit https://nvd.nist.gov/developers/request-an-api-key to get an API key if you don't have one"
+echo -e "\n${YELLOW}🔑 NVD Integration (Optional):${NC}"
+echo -e "• The application will work without an NVD API key"
+echo -e "• Basic SBOM generation and management will function normally"
+echo -e "• To enable vulnerability scanning features later:"
+echo "  1. Get an API key from https://nvd.nist.gov/developers/request-an-api-key"
+echo "  2. Add it to .env file: NVD_API_KEY=your-key-here"
 
 if [ -d .git ]; then
     echo -e "\n${YELLOW}📝 GitHub Integration:${NC}"
