@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 # Error handling
 set -e
 trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
-trap 'echo -e "${RED}❌ Command \"${last_command}\" failed with exit code $?.${NC}"' EXIT
+trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo -e "${RED} Command \"${last_command}\" failed with exit code $exit_code${NC}"; fi' EXIT
 
 # Detect OS type
 OS_TYPE="unknown"
@@ -20,7 +20,7 @@ case "$OSTYPE" in
     *)        OS_TYPE="unknown" ;;
 esac
 
-echo -e "${GREEN}🚀 Setting up SBOM Generator...${NC}\n"
+echo -e "${GREEN} Setting up SBOM Generator...${NC}\n"
 
 # Function to get available memory in MB
 get_available_memory() {
@@ -58,23 +58,23 @@ get_disk_space() {
 
 # Function to check system requirements
 check_system_requirements() {
-    echo -e "${BLUE}🔍 Checking system requirements...${NC}"
+    echo -e "${BLUE} Checking system requirements...${NC}"
     
     # Check memory
     local mem_available=$(get_available_memory)
     if [ "$mem_available" -lt 1024 ]; then
-        echo -e "${YELLOW}⚠️  Warning: Less than 1GB RAM available${NC}"
+        echo -e "${YELLOW} Warning: Less than 1GB RAM available${NC}"
     fi
     
     # Check disk space
     local free_space=$(get_disk_space)
     if [ "$free_space" -lt 1024 ]; then
-        echo -e "${YELLOW}⚠️  Warning: Less than 1GB free disk space${NC}"
+        echo -e "${YELLOW} Warning: Less than 1GB free disk space${NC}"
     fi
     
     # Check if running as root
     if [ "$EUID" -eq 0 ]; then
-        echo -e "${YELLOW}⚠️  Warning: Running as root user${NC}"
+        echo -e "${YELLOW} Warning: Running as root user${NC}"
         echo -e "${YELLOW}   This is not recommended for security reasons.${NC}"
         echo -e "${YELLOW}   Consider running as a non-root user with sudo privileges.${NC}"
         
@@ -106,7 +106,7 @@ detect_package_manager() {
 
 # Function to install Node.js and npm
 install_node() {
-    echo -e "${YELLOW}📦 Installing Node.js and npm...${NC}"
+    echo -e "${YELLOW} Installing Node.js and npm...${NC}"
     
     case "$OS_TYPE" in
         "macos")
@@ -120,7 +120,7 @@ install_node() {
             local pkg_manager=$(detect_package_manager)
             case "$pkg_manager" in
                 "apt")
-                    echo -e "${BLUE}📦 Adding NodeSource repository...${NC}"
+                    echo -e "${BLUE} Adding NodeSource repository...${NC}"
                     curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
                     sudo apt-get install -y nodejs
                     ;;
@@ -135,14 +135,14 @@ install_node() {
                     sudo pacman -Sy nodejs npm
                     ;;
                 *)
-                    echo -e "${RED}❌ Unsupported package manager${NC}"
+                    echo -e "${RED} Unsupported package manager${NC}"
                     echo -e "${YELLOW}Please install Node.js (v18+) manually from https://nodejs.org${NC}"
                     exit 1
                     ;;
             esac
             ;;
         *)
-            echo -e "${RED}❌ Unsupported operating system${NC}"
+            echo -e "${RED} Unsupported operating system${NC}"
             echo -e "${YELLOW}Please install Node.js (v18+) manually from https://nodejs.org${NC}"
             exit 1
             ;;
@@ -150,7 +150,7 @@ install_node() {
     
     # Verify installation
     if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-        echo -e "${RED}❌ Node.js or npm installation failed${NC}"
+        echo -e "${RED} Node.js or npm installation failed${NC}"
         exit 1
     fi
 }
@@ -161,23 +161,31 @@ update_env_file() {
     local value="$2"
     local file="$3"
     
-    case "$OS_TYPE" in
-        "macos")
-            sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
-            ;;
-        "linux")
-            sed -i "s|^${key}=.*|${key}=${value}|" "$file"
-            ;;
-        *)
-            # Fallback to perl which works on both systems
-            perl -i -pe "s|^${key}=.*|${key}=${value}|" "$file"
-            ;;
-    esac
+    # Create a temporary file
+    local temp_file="$file.tmp"
+    
+    # Read the file line by line and replace the matching line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ $line =~ ^$key= ]]; then
+            echo "$key=$value"
+        else
+            echo "$line"
+        fi
+    done < "$file" > "$temp_file"
+    
+    # Move the temporary file to the original
+    mv "$temp_file" "$file"
+    
+    # Verify the update
+    if ! grep -q "^$key=$value" "$file"; then
+        echo -e "${RED} Failed to update $key in $file${NC}"
+        return 1
+    fi
 }
 
 # Function to check internet connectivity
 check_internet() {
-    echo -e "${BLUE}🌐 Checking internet connectivity...${NC}"
+    echo -e "${BLUE} Checking internet connectivity...${NC}"
     
     # Try multiple reliable domains
     local test_domains=("google.com" "github.com" "npmjs.com")
@@ -191,22 +199,22 @@ check_internet() {
     done
     
     if ! $connected; then
-        echo -e "${RED}❌ No internet connection detected${NC}"
+        echo -e "${RED} No internet connection detected${NC}"
         echo -e "${YELLOW}Please check your internet connection and try again${NC}"
         exit 1
     fi
     
-    echo -e "${GREEN}✓ Internet connection verified${NC}"
+    echo -e "${GREEN} Internet connection verified${NC}"
 }
 
 # Function to validate NVD API key
 validate_nvd_key() {
     local api_key=$1
-    echo -e "${BLUE}🔑 Validating NVD API key...${NC}"
+    echo -e "${BLUE} Validating NVD API key...${NC}"
     
     # Skip if no key provided
     if [ -z "$api_key" ]; then
-        echo -e "${YELLOW}⚠️  No NVD API key provided${NC}"
+        echo -e "${YELLOW} No NVD API key provided${NC}"
         echo -e "${YELLOW}   Vulnerability scanning will be limited${NC}"
         return 0
     fi
@@ -217,15 +225,15 @@ validate_nvd_key() {
         "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1")
     
     if [ "$response" = "200" ]; then
-        echo -e "${GREEN}✓ NVD API key is valid${NC}"
+        echo -e "${GREEN} NVD API key is valid${NC}"
         return 0
     elif [ "$response" = "403" ]; then
-        echo -e "${RED}❌ Invalid NVD API key${NC}"
+        echo -e "${RED} Invalid NVD API key${NC}"
         echo -e "${YELLOW}Please check your API key and try again${NC}"
         echo -e "${YELLOW}Get a key from: https://nvd.nist.gov/developers/request-an-api-key${NC}"
         return 1
     else
-        echo -e "${RED}❌ Error checking NVD API key (HTTP $response)${NC}"
+        echo -e "${RED} Error checking NVD API key (HTTP $response)${NC}"
         echo -e "${YELLOW}There might be an issue with the NVD service${NC}"
         return 1
     fi
@@ -234,28 +242,33 @@ validate_nvd_key() {
 # Function to set up environment file
 setup_env() {
     if [ ! -f .env ]; then
-        echo -e "\n${YELLOW}🔧 Creating .env file...${NC}"
+        echo -e "\n${YELLOW} Creating .env file...${NC}"
         if [ -f .env.example ]; then
             cp .env.example .env
-            echo -e "${GREEN}✓ .env file created from example${NC}"
+            echo -e "${GREEN} .env file created from example${NC}"
         else
             echo "NVD_API_KEY=" > .env
-            echo -e "${GREEN}✓ Basic .env file created${NC}"
+            echo -e "${GREEN} Basic .env file created${NC}"
         fi
         
-        echo -e "\n${BLUE}🔑 NVD API Key Setup${NC}"
+        echo -e "\n${BLUE} NVD API Key Setup${NC}"
         echo -e "Would you like to configure your NVD API key now? (Recommended)"
         read -p "Enter your NVD API key (or press Enter to skip): " nvd_key
         
         if [ ! -z "$nvd_key" ]; then
             if validate_nvd_key "$nvd_key"; then
-                update_env_file "NVD_API_KEY" "$nvd_key" ".env"
-                echo -e "${GREEN}✓ NVD API key configured${NC}"
+                if ! update_env_file "NVD_API_KEY" "$nvd_key" ".env"; then
+                    echo -e "${RED} Failed to update NVD API key in .env file${NC}"
+                    echo -e "${YELLOW}Please add the following line to your .env file manually:${NC}"
+                    echo -e "NVD_API_KEY=$nvd_key"
+                    return 1
+                fi
+                echo -e "${GREEN} NVD API key configured${NC}"
             fi
         fi
     else
-        echo -e "${GREEN}✓ .env file already exists${NC}"
-        existing_key=$(grep "NVD_API_KEY" .env | cut -d '=' -f2)
+        echo -e "${GREEN} .env file already exists${NC}"
+        existing_key=$(grep "^NVD_API_KEY=" .env | cut -d '=' -f2)
         if [ ! -z "$existing_key" ]; then
             validate_nvd_key "$existing_key"
         fi
@@ -264,46 +277,46 @@ setup_env() {
 
 # Function to check and install npm dependencies
 install_dependencies() {
-    echo -e "\n${GREEN}📦 Checking dependencies...${NC}"
+    echo -e "\n${GREEN} Checking dependencies...${NC}"
     
     # Verify npm registry access
-    echo -e "${BLUE}📡 Checking npm registry access...${NC}"
+    echo -e "${BLUE} Checking npm registry access...${NC}"
     if ! npm ping &> /dev/null; then
-        echo -e "${RED}❌ Cannot access npm registry${NC}"
+        echo -e "${RED} Cannot access npm registry${NC}"
         echo -e "${YELLOW}Please check your internet connection and npm configuration${NC}"
         exit 1
     fi
     
     if [ ! -d "node_modules" ]; then
-        echo -e "${YELLOW}⚙️  First-time installation detected${NC}"
+        echo -e "${YELLOW}  First-time installation detected${NC}"
         if ! npm install; then
-            echo -e "${RED}❌ Installation failed${NC}"
+            echo -e "${RED} Installation failed${NC}"
             echo -e "${YELLOW}Try running with --verbose for more details${NC}"
             exit 1
         fi
     elif [ "$(find package.json -newer package-lock.json)" ]; then
-        echo -e "${YELLOW}⚙️  Dependency updates detected${NC}"
+        echo -e "${YELLOW}  Dependency updates detected${NC}"
         if ! npm update; then
-            echo -e "${RED}❌ Update failed${NC}"
+            echo -e "${RED} Update failed${NC}"
             echo -e "${YELLOW}Try running with --verbose for more details${NC}"
             exit 1
         fi
     else
-        echo -e "${GREEN}✅ Dependencies already up-to-date${NC}"
+        echo -e "${GREEN} Dependencies already up-to-date${NC}"
     fi
 }
 
 # Function to show installation summary
 show_summary() {
-    echo -e "\n${BLUE}📋 Installation Summary:${NC}"
-    echo -e "${GREEN}✓ System requirements checked${NC}"
-    echo -e "${GREEN}✓ Node.js version verified${NC}"
-    echo -e "${GREEN}✓ Environment file created${NC}"
-    echo -e "${GREEN}✓ Dependencies installed${NC}"
+    echo -e "\n${BLUE} Installation Summary:${NC}"
+    echo -e "${GREEN} System requirements checked${NC}"
+    echo -e "${GREEN} Node.js version verified${NC}"
+    echo -e "${GREEN} Environment file created${NC}"
+    echo -e "${GREEN} Dependencies installed${NC}"
     if [ -d .git ]; then
-        echo -e "${GREEN}✓ Git repository initialized${NC}"
+        echo -e "${GREEN} Git repository initialized${NC}"
     fi
-    echo -e "${GREEN}✓ Build completed${NC}"
+    echo -e "${GREEN} Build completed${NC}"
 }
 
 # Function to find available port
@@ -317,26 +330,26 @@ find_available_port() {
 
 # Function to build the application
 build_app() {
-    echo -e "\n${GREEN}🏗️  Building application...${NC}"
+    echo -e "\n${GREEN}  Building application...${NC}"
     if ! npm run build; then
-        echo -e "${RED}❌ Build failed${NC}"
+        echo -e "${RED} Build failed${NC}"
         exit 1
     fi
-    echo -e "${GREEN}✓ Build completed successfully${NC}"
+    echo -e "${GREEN} Build completed successfully${NC}"
 }
 
 # Function to start the application
 start_app() {
-    echo -e "\n${GREEN}🚀 Starting SBOM Generator...${NC}"
+    echo -e "\n${GREEN} Starting SBOM Generator...${NC}"
     
     # Kill any existing process on the port
     if lsof -ti :$PORT >/dev/null; then
-        echo -e "${YELLOW}⚠️  Port $PORT is in use. Stopping existing process...${NC}"
+        echo -e "${YELLOW}  Port $PORT is in use. Stopping existing process...${NC}"
         kill -9 $(lsof -ti :$PORT) 2>/dev/null
     fi
     
     if ! PORT=$PORT npm run start; then
-        echo -e "${RED}❌ Failed to start SBOM Generator${NC}"
+        echo -e "${RED} Failed to start SBOM Generator${NC}"
         exit 1
     fi
 }
@@ -352,9 +365,9 @@ main() {
     check_internet
     
     # Check and install required commands
-    echo -e "${GREEN}🔍 Checking dependencies...${NC}"
+    echo -e "${GREEN} Checking dependencies...${NC}"
     if ! command -v node &> /dev/null; then
-        echo -e "${YELLOW}🔧 Attempting to install Node.js and npm...${NC}"
+        echo -e "${YELLOW}  Attempting to install Node.js and npm...${NC}"
         install_node
     fi
     
@@ -363,7 +376,7 @@ main() {
     REQUIRED_VERSION="18.0.0"
     
     if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$NODE_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
-        echo -e "${RED}❌ Node.js version must be 18.0.0 or higher${NC}"
+        echo -e "${RED} Node.js version must be 18.0.0 or higher${NC}"
         echo -e "Current version: ${NODE_VERSION}"
         echo -e "Please upgrade Node.js and try again"
         exit 1
@@ -385,16 +398,16 @@ main() {
     # Show installation summary
     show_summary
     
-    echo -e "\n${GREEN}✅ Installation complete!${NC}"
+    echo -e "\n${GREEN} Installation complete!${NC}"
     
     # Application access instructions
-    echo -e "\n${YELLOW}🌐 Accessing the Application:${NC}"
+    echo -e "\n${YELLOW} Accessing the Application:${NC}"
     echo -e "1. The application will start automatically"
     echo -e "2. Access the application at:"
     echo -e "   • Local:   ${GREEN}http://localhost:$APP_PORT${NC}"
     echo -e "   • Network: ${GREEN}http://$(hostname -I | awk '{print $1}'):$APP_PORT${NC}"
     
-    echo -e "\n${YELLOW}🔑 NVD Integration:${NC}"
+    echo -e "\n${YELLOW} NVD Integration:${NC}"
     echo -e "• To enable vulnerability scanning:"
     echo "  1. Get an API key from https://nvd.nist.gov/developers/request-an-api-key"
     echo "  2. Add it to your .env file: NVD_API_KEY=your-key-here"
