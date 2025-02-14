@@ -9,12 +9,55 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}🚀 Setting up SBOM Generator...${NC}\n"
 
+# Function to detect Linux distribution
+detect_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    else
+        echo "unknown"
+    fi
+}
+
+# Function to install Node.js and npm on different distributions
+install_node() {
+    local DISTRO=$(detect_distro)
+    echo -e "${YELLOW}📦 Installing Node.js and npm on $DISTRO...${NC}"
+    
+    case $DISTRO in
+        "ubuntu"|"debian")
+            sudo apt-get update
+            sudo apt-get install -y curl
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+            ;;
+        "fedora")
+            sudo dnf install -y nodejs npm
+            ;;
+        "centos"|"rhel")
+            sudo yum install -y nodejs npm
+            ;;
+        "arch")
+            sudo pacman -Sy nodejs npm
+            ;;
+        *)
+            echo -e "${RED}❌ Unsupported distribution. Please install Node.js (v18+) and npm manually.${NC}"
+            exit 1
+            ;;
+    esac
+}
+
 # Function to check if a command exists
 check_command() {
     if ! command -v "$1" &> /dev/null; then
         echo -e "${RED}❌ $1 is not installed.${NC}"
-        echo -e "Please install $1 using your system's package manager."
-        exit 1
+        if [ "$1" = "node" ] || [ "$1" = "npm" ]; then
+            echo -e "${YELLOW}🔧 Attempting to install Node.js and npm...${NC}"
+            install_node
+        else
+            echo -e "Please install $1 using your system's package manager."
+            exit 1
+        fi
     fi
 }
 
