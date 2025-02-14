@@ -1,0 +1,58 @@
+rupesh@Rupeshs-MacBook-Pro ~ % cd Desktop 
+rupesh@Rupeshs-MacBook-Pro Desktop % mkdir test
+rupesh@Rupeshs-MacBook-Pro Desktop % cd test
+rupesh@Rupeshs-MacBook-Pro test % git clone https://github.com/rupesh43210/sbom-generator.git
+Cloning into 'sbom-generator'...
+remote: Enumerating objects: 93, done.
+remote: Counting objects: 100% (93/93), done.
+remote: Compressing objects: 100% (83/83), done.
+remote: Total 93 (delta 8), reused 93 (delta 8), pack-reused 0 (from 0)
+Receiving objects: 100% (93/93), 1012.53 KiB | 2.90 MiB/s, done.
+Resolving deltas: 100% (8/8), done.
+rupesh@Rupeshs-MacBook-Pro test % cd sbom-generator 
+rupesh@Rupeshs-MacBook-Pro sbom-generator % ls
+LICENSE			install.sh		shared
+README.md		package-lock.json	tailwind.config.ts
+client			package.json		theme.json
+drizzle.config.ts	postcss.config.js	tsconfig.json
+generated-icon.png	server			vite.config.ts
+rupesh@Rupeshs-MacBook-Pro sbom-generator % chmod +x install.sh 
+rupesh@Rupeshs-MacBook-Pro sbom-generator % ./install.sh 
+🚀 Setting up SBOM Generator...
+📦 Installing dependencies...
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+
+added 474 packages, and audited 475 packages in 5s
+
+60 packages are looking for funding
+  run `npm fund` for details
+
+1 moderate severity vulnerability
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+npm notice
+npm notice New major version of npm available! 10.9.0 -> 11.1.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.1.0
+npm notice To update run: npm install -g npm@11.1.0
+npm notice
+🔧 Creating .env file...
+⚠️ Please add your NVD API key to the .env file
+✨ Installation complete!
+
+To start the development server:
+npm run dev
+
+Don't forget to:
+1. Add your NVD API key to the .env file
+2. Visit https://nvd.nist.gov/developers/request-an-api-key to get an API key if you don't have one
+
+To push to your GitHub repository:
+1. Create a new repository on GitHub
+2. Run: git remote add origin <your-repo-url>
+3. Run: git push -u origin main
+
+rupesh@Rupeshs-MacBook-Pro sbom-generator % 

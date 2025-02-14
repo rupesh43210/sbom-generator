@@ -81,8 +81,16 @@ if [ ! -d .git ]; then
 fi
 
 echo -e "\n${GREEN}✅ Installation complete!${NC}"
-echo -e "\n${YELLOW}To start the development server:${NC}"
-echo -e "npm run dev"
+
+# Application access instructions
+echo -e "\n${YELLOW}🌐 Accessing the Application:${NC}"
+echo -e "1. Start the development server:"
+echo -e "   ${GREEN}npm run dev${NC}"
+echo -e "\n2. Once started, access the application at:"
+echo -e "   • Local:   ${GREEN}http://localhost:5000${NC}"
+echo -e "   • Network: ${GREEN}http://0.0.0.0:5000${NC}"
+echo -e "   The app will be available on port 5000 by default"
+
 echo -e "\n${YELLOW}Don't forget to:${NC}"
 echo "1. Add your NVD API key to the .env file"
 echo "2. Visit https://nvd.nist.gov/developers/request-an-api-key to get an API key if you don't have one"
