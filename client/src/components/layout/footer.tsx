@@ -1,4 +1,4 @@
-import { Github } from "lucide-react";
+import { Github, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
@@ -14,6 +14,18 @@ export function Footer() {
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <Separator orientation="vertical" className="hidden h-4 sm:block" />
+            <span className="flex items-center gap-1">
+              Created with <Heart className="h-4 w-4 text-red-500 animate-pulse" /> by{" "}
+              <a
+                href="https://github.com/rupesh43210"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium hover:text-foreground hover:underline"
+              >
+                Rupesh
+              </a>
+            </span>
+            <Separator orientation="vertical" className="h-4" />
             <a
               href="/docs"
               className="hover:text-foreground hover:underline"
