@@ -42,8 +42,22 @@ check_system_requirements() {
     
     # Check if running as root
     if [ "$EUID" -eq 0 ]; then
-        echo -e "${RED}❌ Please do not run this script as root${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠️  Warning: Running as root user${NC}"
+        echo -e "${YELLOW}   This is not recommended for security reasons.${NC}"
+        echo -e "${YELLOW}   Consider running as a non-root user with sudo privileges.${NC}"
+        
+        # Ask for confirmation
+        read -p "Continue as root? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${RED}Installation cancelled${NC}"
+            exit 1
+        fi
+        
+        # Set npm to use different directory for global packages
+        echo -e "${BLUE}📦 Configuring npm for root user...${NC}"
+        mkdir -p /usr/local/lib/node_modules
+        npm config set prefix /usr/local
     fi
 }
 
