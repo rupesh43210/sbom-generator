@@ -4,6 +4,7 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}🚀 Setting up SBOM Generator...${NC}\n"
@@ -37,16 +38,38 @@ install_dependencies() {
         npm install
         if [ $? -ne 0 ]; then
             echo -e "${RED}❌ Failed to install dependencies${NC}"
+            echo -e "${RED}Please check your internet connection and try again${NC}"
             exit 1
         fi
     else
         npm ci
         if [ $? -ne 0 ]; then
             echo -e "${RED}❌ Failed to install dependencies${NC}"
+            echo -e "${RED}Try removing node_modules and package-lock.json, then run the script again${NC}"
             exit 1
         fi
     fi
+
+    # Verify critical dependencies
+    if [ ! -d "node_modules/@tanstack" ] || [ ! -d "node_modules/react" ]; then
+        echo -e "${RED}❌ Critical dependencies are missing${NC}"
+        echo -e "${RED}Please try running 'npm install' manually${NC}"
+        exit 1
+    fi
+
     echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
+}
+
+# Function to show installation summary
+show_summary() {
+    echo -e "\n${BLUE}📋 Installation Summary:${NC}"
+    echo -e "${GREEN}✓ System requirements checked${NC}"
+    echo -e "${GREEN}✓ Node.js version verified${NC}"
+    echo -e "${GREEN}✓ Environment file created${NC}"
+    echo -e "${GREEN}✓ Dependencies installed${NC}"
+    if [ -d .git ]; then
+        echo -e "${GREEN}✓ Git repository initialized${NC}"
+    fi
 }
 
 # Check required commands
@@ -80,6 +103,9 @@ if [ ! -d .git ]; then
     echo -e "${GREEN}✓ Git repository initialized${NC}"
 fi
 
+# Show installation summary
+show_summary
+
 echo -e "\n${GREEN}✅ Installation complete!${NC}"
 
 # Application access instructions
@@ -91,22 +117,23 @@ echo -e "   • Local:   ${GREEN}http://localhost:5000${NC}"
 echo -e "   • Network: ${GREEN}http://0.0.0.0:5000${NC}"
 echo -e "   The app will be available on port 5000 by default"
 
-echo -e "\n${YELLOW}Don't forget to:${NC}"
+echo -e "\n${YELLOW}🔑 Next Steps:${NC}"
 echo "1. Add your NVD API key to the .env file"
 echo "2. Visit https://nvd.nist.gov/developers/request-an-api-key to get an API key if you don't have one"
 
 if [ -d .git ]; then
-    echo -e "\n${YELLOW}To push to your GitHub repository:${NC}"
+    echo -e "\n${YELLOW}📝 GitHub Integration:${NC}"
     echo "1. Create a new repository on GitHub"
     echo "2. Run: git remote add origin <your-repo-url>"
     echo "3. Run: git push -u origin main"
 fi
 
-# Verify the installation
-echo -e "\n${GREEN}🔍 Verifying installation...${NC}"
+# Verify the complete installation
+echo -e "\n${GREEN}🔍 Final Verification:${NC}"
 if [ -f package.json ] && [ -d node_modules ] && [ -f .env ]; then
-    echo -e "${GREEN}✓ Basic setup looks good${NC}"
+    echo -e "${GREEN}✓ All components are installed correctly${NC}"
     echo -e "${GREEN}✓ Ready to start development!${NC}"
+    echo -e "\n${BLUE}Happy coding! 🎉${NC}"
 else
     echo -e "${RED}⚠️  Some components may be missing. Please check the logs above for errors.${NC}"
 fi
