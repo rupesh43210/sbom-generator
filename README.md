@@ -208,6 +208,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-Built with ❤️ and 💪 [Rupesh](https://github.com/rupesh43210)
+Built with ❤️ and 💪 
+[Rupesh](https://github.com/rupesh43210)
 
 </div>
